@@ -41,7 +41,8 @@
         <button type="button" data-action="day" data-day="27" aria-pressed="false"><strong>27 листопада</strong><span>П’ятниця</span></button>
       </div>
       <div id="view-head"></div>
-      <div id="filters" hidden>
+      <details id="filters" hidden>
+        <summary>Пошук і фільтри</summary>
         <label for="query">Пошук виступів</label>
         <input id="query" type="search" placeholder="Тема, спікер, компанія" autocomplete="off">
         <div class="filter-grid">
@@ -49,8 +50,7 @@
           <label>Тема<select id="topic"><option value="">Усі теми</option></select></label>
         </div>
         <label class="checkbox"><input id="remaining" type="checkbox"> Показати поточні й майбутні</label>
-        <p id="result-count" class="muted" role="status"></p>
-      </div>
+      </details>
       <div id="list"></div>
       <footer class="footer">
         <a href="https://wawtech.io/2026/agenda">Офіційний розклад</a>

@@ -22,6 +22,9 @@ const dayString = day => `2026-11-${day}`;
 const officialAgenda = "https://wawtech.io/2026/agenda";
 const faq = "https://wawtech.io/2026/faq";
 const shortStages = { MAIN: "Main", ENGINEERING: "Engineering", GROWTH: "Growth", STUDIO: "Studio" };
+const gridScale = 4.6;
+const minutes = time => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+const timeLabel = minute => `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
 
 let selectedDay = warsawDate.format(new Date()) === dayString(27) ? 27 : 26;
 let view = "route";
@@ -118,10 +121,11 @@ function breakCard(slot) {
 
 function timeStatus() {
   const now = new Date();
-  const day = Number(warsawDate.format(now).slice(-2));
+  const date = warsawDate.format(now);
+  const day = Number(date.slice(-2));
   const time = warsawTime.format(now);
   const isConference = warsawDate.format(now) === dayString(26) || warsawDate.format(now) === dayString(27);
-  return { day, time, isConference };
+  return { date, day, time, isConference };
 }
 
 function updateEventStatus() {
@@ -156,10 +160,83 @@ function filteredSessions() {
   const now = timeStatus();
   return sessions.filter(s => {
     if (s.day !== selectedDay || (stage && stage !== s.stage) || (topic && !s.tags.includes(topic))) return false;
-    if (remaining && now.isConference && (s.day < now.day || (s.day === now.day && s.end <= now.time))) return false;
+    if (remaining && (now.date > dayString(s.day) || (now.date === dayString(s.day) && s.end <= now.time))) return false;
     const haystack = normalize([s.title, s.stage, ...s.tags, ...s.people.flatMap(p => [p.name, p.role]), ...(details[s.id] ?? [])].join(" "));
     return query.every(term => haystack.includes(term));
   });
+}
+
+function agendaGrid(items) {
+  const day = sessions.filter(s => s.day === selectedDay);
+  const from = Math.floor(minutes(day[0].start) / 30) * 30;
+  const until = Math.ceil(Math.max(...day.map(s => minutes(s.end))) / 30) * 30;
+  const stages = $("stage").value ? [$("stage").value] : Object.keys(shortStages);
+  const ticks = Array.from({ length: (until - from) / 30 + 1 }, (_, index) => from + index * 30);
+  return `<div class="grid-tools">
+    <p class="muted" role="status">Виступів: ${items.length}${items.length ? "" : " · зміни фільтри"}</p>
+    ${button("grid-now", "До поточного часу", "secondary", "id=grid-now hidden")}
+  </div>
+  ${stages.length > 1 ? '<p class="grid-hint">Гортай убік, щоб побачити інші сцени.</p>' : ""}
+  <div class="agenda-scroll" id="agenda-scroll" tabindex="0" role="region" aria-label="Сітка виступів">
+    <div class="agenda-board" data-from="${from}" data-until="${until}" style="--columns:${stages.length};--day-height:${(until - from) * gridScale + 18}px">
+      <div class="agenda-heading agenda-corner">Час</div>
+      ${stages.map(stage => `<div class="agenda-heading agenda-stage" data-stage="${stage}">${shortStages[stage]}</div>`).join("")}
+      <div class="agenda-axis" aria-hidden="true">
+        ${ticks.map(tick => `<span class="agenda-tick" style="top:${(tick - from) * gridScale}px">${timeLabel(tick)}</span>`).join("")}
+        <span class="agenda-now-label" hidden></span>
+      </div>
+      ${stages.map(stage => `<section class="agenda-lane" aria-label="${shortStages[stage]}" data-stage="${stage}">
+        ${items.filter(s => s.stage === stage).map(s => gridSession(s, from)).join("")}
+        <div class="agenda-now-line" aria-hidden="true" hidden></div>
+      </section>`).join("")}
+    </div>
+  </div>`;
+}
+
+function gridSession(session, from) {
+  const { id, title, start, end, people } = session;
+  const saved = plan.saved.includes(id);
+  const clash = plan.saved.some(other => overlaps(session, byId.get(other)));
+  return `<article class="grid-session" id="card-${id}" data-id="${id}"
+    style="top:${(minutes(start) - from) * gridScale}px;height:${(minutes(end) - minutes(start)) * gridScale}px">
+    <button type="button" class="grid-session-info" data-action="details" data-id="${id}">
+      <span class="grid-slot">${start}–${end}<span class="grid-live" hidden>Йде</span></span>
+      <strong>${safe(title)}</strong>
+      <span class="grid-people">${safe(people.map(person => person.name).join(", "))}</span>
+      ${clash ? '<span class="grid-clash">Перетин із планом</span>' : ""}
+    </button>
+    <button type="button" class="save grid-save" data-action="save" data-id="${id}" aria-pressed="${saved}"
+      aria-label="${saved ? "Прибрати з плану" : "Зберегти в план"}: ${safe(title)}">${saved ? "★" : "☆"}</button>
+  </article>`;
+}
+
+function showFilteredAgenda() {
+  renderList();
+  const scroll = $("agenda-scroll");
+  if (!scroll) return;
+  const first = filteredSessions()[0];
+  scroll.scrollTop = first ? Math.max(0, (minutes(first.start) - Number(scroll.firstElementChild.dataset.from)) * gridScale - 28) : 0;
+  scroll.scrollLeft = 0;
+}
+
+function updateAgendaClock() {
+  const board = document.querySelector(".agenda-board");
+  if (!board) return;
+  const now = timeStatus();
+  const minute = minutes(now.time);
+  const today = now.isConference && now.day === selectedDay;
+  const visible = today && minute >= Number(board.dataset.from) && minute <= Number(board.dataset.until);
+  board.style.setProperty("--now-top", `${(minute - Number(board.dataset.from)) * gridScale}px`);
+  $("grid-now").hidden = !visible;
+  for (const marker of board.querySelectorAll(".agenda-now-label, .agenda-now-line")) marker.hidden = !visible;
+  board.querySelector(".agenda-now-label").textContent = now.time;
+  for (const card of board.querySelectorAll(".grid-session")) {
+    const session = byId.get(card.dataset.id);
+    const live = today && session.start <= now.time && now.time < session.end;
+    card.classList.toggle("is-live", live);
+    card.classList.toggle("is-past", now.date > dayString(selectedDay) || (today && session.end <= now.time));
+    card.querySelector(".grid-live").hidden = !live;
+  }
 }
 
 function renderList() {
@@ -171,8 +248,12 @@ function renderList() {
   } else if (view === "mine") {
     items = todays.filter(s => plan.saved.includes(s.id));
   } else {
-    items = filteredSessions();
-    $("result-count").textContent = `Виступів: ${items.length}`;
+    const oldGrid = $("agenda-scroll");
+    const position = oldGrid ? [oldGrid.scrollLeft, oldGrid.scrollTop] : null;
+    $("list").innerHTML = agendaGrid(filteredSessions());
+    if (position) $("agenda-scroll").scrollTo(...position);
+    updateAgendaClock();
+    return;
   }
   const empty = view === "mine" ? "У плані цього дня ще порожньо. Познач зірочкою виступ, який хочеш відвідати." :
     "Виступів за цими фільтрами немає. Спробуй іншу тему чи сцену.";
@@ -192,6 +273,7 @@ function render() {
   $("view-head").className = "view-head";
   const heading = viewHeading();
   if ($("view-head").innerHTML !== heading) $("view-head").innerHTML = heading;
+  $("main").classList.toggle("agenda-mode", view === "agenda");
   $("filters").hidden = view !== "agenda";
   renderList();
   updateEventStatus();
@@ -358,6 +440,7 @@ document.addEventListener("click", event => {
   if (action === "day") {
     selectedDay = Number(target.dataset.day);
     render();
+    $("agenda-scroll")?.scrollTo(0, 0);
   } else if (action === "view") {
     showView(target.dataset.view);
   } else if (action === "jump") {
@@ -366,9 +449,13 @@ document.addEventListener("click", event => {
       $("query").value = "";
       $("stage").value = "";
       $("topic").value = "";
+      $("remaining").checked = false;
     }
     showView(view === "mine" && !plan.saved.includes(id) ? "route" : view, { scroll: false });
-    $("card-" + id)?.scrollIntoView({ block: "start" });
+    $("card-" + id)?.scrollIntoView({ block: "start", inline: "center" });
+  } else if (action === "grid-now") {
+    const board = document.querySelector(".agenda-board");
+    if (board) $("agenda-scroll").scrollTop = Math.max(0, (minutes(timeStatus().time) - Number(board.dataset.from)) * gridScale - 100);
   } else if (["details", "alternatives", "venue", "guide"].includes(action)) {
     showDialog(action, id);
   } else if (action === "close") {
@@ -402,14 +489,20 @@ dialog.addEventListener("input", event => {
 for (const tag of [...new Set(sessions.flatMap(s => s.tags))].sort((a, b) => a.localeCompare(b, "uk"))) {
   $("topic").add(new Option(tag, tag));
 }
-$("query").addEventListener("input", renderList);
-for (const id of ["stage", "topic", "remaining"]) $(id).addEventListener("change", renderList);
+$("query").addEventListener("input", showFilteredAgenda);
+for (const id of ["stage", "topic", "remaining"]) $(id).addEventListener("change", showFilteredAgenda);
 importFile.addEventListener("change", importPlan);
 render();
 setInterval(() => {
   updateEventStatus();
-  if (view === "agenda" && $("remaining").checked && !document.getElementById("list").contains(document.activeElement)) renderList();
+  updateAgendaClock();
+  if (view === "agenda" && $("remaining").checked && !dialog.open && !$("list").contains(document.activeElement)) renderList();
 }, 30000);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
+  updateEventStatus();
+  updateAgendaClock();
+});
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js").then(() => navigator.serviceWorker.ready).then(() => {
