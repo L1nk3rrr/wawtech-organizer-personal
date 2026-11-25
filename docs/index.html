@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101d31">
+  <meta name="description" content="Мобільний маршрут WAWTech 2026. Виступи, сцени, власний розклад і нотатки.">
+  <meta name="apple-mobile-web-app-title" content="WAWTech план">
+  <title>WAWTech 2026 · План на два дні</title>
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icon-180.png">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./style.css">
+  <script defer src="./agenda.js"></script>
+  <script defer src="./route.js"></script>
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">До розкладу</a>
+  <header class="masthead">
+    <div class="wrap">
+      <div class="topline">
+        <span class="mark" aria-hidden="true">W</span>
+        <span>26–27 листопада · Варшава</span>
+        <button class="quiet-button venue-button" data-action="venue" type="button">Локація</button>
+      </div>
+      <div class="hero">
+        <h1>WAWTech <span>2026</span></h1>
+        <p>Твій план на два дні</p>
+      </div>
+      <div class="hero-status" id="event-status">Час Варшави · EXPO XXI</div>
+    </div>
+  </header>
+
+  <main id="main" class="wrap" tabindex="-1">
+    <div id="storage-alert" class="notice" hidden>Браузер не дозволив зберегти зміни. Можна експортувати їх із «Мого плану» перед закриттям вкладки.</div>
+    <noscript><p class="notice">Увімкни JavaScript, щоб відкрився планувальник. <a href="https://wawtech.io/2026/agenda">Офіційна програма WAWTech</a></p></noscript>
+    <section id="schedule" aria-label="Розклад на день">
+      <div class="day-picker" id="day-picker" aria-label="День конференції">
+        <button type="button" data-action="day" data-day="26" aria-pressed="true"><strong>26 листопада</strong><span>Четвер</span></button>
+        <button type="button" data-action="day" data-day="27" aria-pressed="false"><strong>27 листопада</strong><span>П’ятниця</span></button>
+      </div>
+      <div id="view-head"></div>
+      <div id="filters" hidden>
+        <label for="query">Пошук виступів</label>
+        <input id="query" type="search" placeholder="Тема, спікер, компанія" autocomplete="off">
+        <div class="filter-grid">
+          <label>Сцена<select id="stage"><option value="">Усі сцени</option><option value="MAIN">Main</option><option value="ENGINEERING">Engineering</option><option value="GROWTH">Growth</option><option value="STUDIO">Studio</option></select></label>
+          <label>Тема<select id="topic"><option value="">Усі теми</option></select></label>
+        </div>
+        <label class="checkbox"><input id="remaining" type="checkbox"> Показати поточні й майбутні</label>
+        <p id="result-count" class="muted" role="status"></p>
+      </div>
+      <div id="list"></div>
+      <footer class="footer">
+        <a href="https://wawtech.io/2026/agenda">Офіційний розклад</a>
+        <button type="button" class="link-button" data-action="guide">Чекліст і нотатки</button>
+        <p>Розклад станом на 25 листопада. Перед переходом звіряй сцену з програмою організаторів.</p>
+        <p id="offline-status" role="status"></p>
+      </footer>
+    </section>
+  </main>
+
+  <nav class="tabbar" aria-label="Розділи планувальника">
+    <div class="wrap">
+      <button type="button" data-action="view" data-view="route" aria-current="page"><span class="nav-icon" aria-hidden="true">◈</span>Рекомендації</button>
+      <button type="button" data-action="view" data-view="agenda"><span class="nav-icon" aria-hidden="true">▤</span>Усі виступи</button>
+      <button type="button" data-action="view" data-view="mine"><span class="nav-icon" aria-hidden="true">☆</span>Мій план <span id="saved-count"></span></button>
+    </div>
+  </nav>
+
+  <dialog id="dialog" aria-labelledby="dialog-title">
+    <div class="dialog-bar"><button type="button" class="quiet-button" data-action="close" autofocus>Закрити</button></div>
+    <div id="dialog-body"></div>
+  </dialog>
+  <div class="toast" id="toast" role="status"></div>
+  <input id="import-file" type="file" accept=".json,application/json" hidden>
+</body>
+</html>
